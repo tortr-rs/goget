@@ -87,3 +87,6 @@ argument arrays) has clear ownership and is freed by its owner. Builds are
 checked under `make debug` (`-fsanitize=address,undefined`) during
 development; no leaks or UB found so far in goget's own process (child
 processes it execs, like `cmake`/`make`, aren't instrumented by this).
+
+
+## HAIIIII :3 if you wanna suppoirt me please donate here [![ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/L6N725GI1V)
