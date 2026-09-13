@@ -116,12 +116,13 @@ func fetchCodebergSearch(name string) []searchResult {
 	return out
 }
 
-// searchByName searches GitHub, GitLab, and Codeberg (skipping any
-// disabled in cfg) for repos whose name exactly matches name,
+// searchByName searches GitHub, GitLab, Codeberg, and AUR (skipping any
+// disabled in cfg) for packages whose name exactly matches name,
 // case-insensitively. Results are capped at 3 per host, sorted by stars
-// descending within each host, and ordered github -> gitlab -> codeberg
-// overall. A network/API error on one host yields zero results for that
-// host rather than aborting the whole search.
+// (or AUR votes) descending within each host, and ordered github ->
+// gitlab -> codeberg -> aur overall. A network/API error on one host
+// yields zero results for that host rather than aborting the whole
+// search.
 func searchByName(cfg *gogetConfig, name string) []searchResult {
 	var combined []searchResult
 	if configHostEnabled(cfg, "github.com") {
@@ -132,6 +133,12 @@ func searchByName(cfg *gogetConfig, name string) []searchResult {
 	}
 	if configHostEnabled(cfg, "codeberg.org") {
 		combined = append(combined, sortAndCap(fetchCodebergSearch(name), 3)...)
+	}
+	if configHostEnabled(cfg, aurHost) {
+		combined = append(combined, sortAndCap(fetchAURSearch(name), 3)...)
+	}
+	if configHostEnabled(cfg, gentooHost) {
+		combined = append(combined, fetchGentooSearch(name)...)
 	}
 	return combined
 }

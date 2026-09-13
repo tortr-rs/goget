@@ -221,9 +221,23 @@ func releaseFetchAndInstall(owner, repo, shortName string) int {
 		return 1
 	}
 
+	return pickAndInstallAsset(rel.Assets, shortName)
+}
+
+// pickAndInstallAsset tries every plausible Linux asset in assets
+// (matching this host's architecture first, then arch-unnamed assets)
+// until one passes the compatibility check, then verifies its checksum
+// if a manifest is present among assets, then installs it to
+// /usr/local/bin/<shortName>. Shared by releaseFetchAndInstall (GitHub
+// Releases) and binRepoInstall (goget's own package repo) -- the two
+// asset sources differ only in how the []releaseAsset list is obtained.
+//
+// Return convention matches releaseFetchAndInstall: 0 success, 1 no
+// compatible asset found, -1 hard failure.
+func pickAndInstallAsset(assets []releaseAsset, shortName string) int {
 	host := hostArch()
 	var order []int
-	for i, a := range rel.Assets {
+	for i, a := range assets {
 		if checksumIsChecksumFilename(a.Name) || looksLikeOtherOS(a.Name) || looksLikePackageFormat(a.Name) {
 			continue
 		}
@@ -231,7 +245,7 @@ func releaseFetchAndInstall(owner, repo, shortName string) int {
 			order = append(order, i)
 		}
 	}
-	for i, a := range rel.Assets {
+	for i, a := range assets {
 		if checksumIsChecksumFilename(a.Name) || looksLikeOtherOS(a.Name) || looksLikePackageFormat(a.Name) {
 			continue
 		}
@@ -241,7 +255,7 @@ func releaseFetchAndInstall(owner, repo, shortName string) int {
 	}
 
 	for _, idx := range order {
-		binaryPath, workdir, rc := tryAsset(rel.Assets, idx, shortName)
+		binaryPath, workdir, rc := tryAsset(assets, idx, shortName)
 		switch rc {
 		case tryHardFail:
 			return -1

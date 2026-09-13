@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>goget — source-first package manager</title>
-<meta name="description" content="goget builds packages from source by default and only falls back to a prebuilt binary when it can prove — architecture, musl vs glibc, glibc version — that the binary will actually run on your machine.">
+<meta name="description" content="goget builds packages from source by default — preferring a tagged release's source archive over a full git clone — and only falls back to a prebuilt binary when it can prove — architecture, musl vs glibc, glibc version — that the binary will actually run on your machine.">
 <style>
   :root{
     --bg: #f5f7f6;
@@ -195,15 +195,17 @@
 <div class="wrap">
 
   <section class="hero" id="top">
-    <span class="kicker">source-first package manager · C · Linux</span>
+    <span class="kicker">source-first package manager · Go · Linux</span>
     <h1>Build from source.<br>Fetch a binary only when it's <em>proven</em> to run.</h1>
     <p class="lede">
-      goget clones a repo and builds it with whatever build system it actually
-      uses &mdash; CMake, Make, or Autotools. If there's no source build
-      available, it can fall back to a GitHub release binary, but only after
-      checking architecture, musl-vs-glibc, and the exact glibc version it
-      needs against your host. A binary that fails any check is treated as if
-      it doesn't exist.
+      goget gets a repo's source &mdash; preferring a straight HTTP download of
+      the latest tagged release's source archive over a full <code>git
+      clone</code>, falling back to git when there's no tag &mdash; and builds
+      it with whatever build system it actually uses: CMake, Make, or
+      Autotools. If there's no source build available, it can fall back to a
+      GitHub release binary, but only after checking architecture,
+      musl-vs-glibc, and the exact glibc version it needs against your host. A
+      binary that fails any check is treated as if it doesn't exist.
     </p>
     <div class="cta-row">
       <a class="btn primary" href="#how">See how it resolves a repo</a>
@@ -214,7 +216,8 @@
       <div class="bar"><span></span><span></span><span></span></div>
       <pre><span class="c-prompt">$</span> <span class="c-cmd">goget build fastfetch</span>
 <span class="c-out">Found fastfetch-cli/fastfetch on github.com -- proceed? [Y/n]</span> <span class="c-cmd">y</span>
-<span class="c-out">goget: cloning https://github.com/fastfetch-cli/fastfetch.git ...
+<span class="c-out">goget: downloading source archive for fastfetch 2.68.1...
+goget: using release 2.68.1 source archive for fastfetch
 goget: detected CMake build system for fastfetch</span>
 <span class="c-ok">✓ built and installed fastfetch</span>
 
@@ -306,10 +309,10 @@ goget: detected CMake build system for fastfetch</span>
 
   <section id="build">
     <h2>Building goget itself</h2>
-    <p class="sub">Plain Make, no CMake &mdash; a flat, single-binary Linux tool has no need for it.</p>
+    <p class="sub">Go, standard library only &mdash; no third-party modules, no libcurl, no libarchive. <code>CGO_ENABLED=0</code> means the result is a genuinely static binary.</p>
     <ol class="steps">
       <li><div><code>git clone https://github.com/tortr-rs/goget.git</code><p>Clone the source.</p></div></li>
-      <li><div><code>make</code><p>Builds against libcurl (via pkg-config) and a vendored copy of cJSON.</p></div></li>
+      <li><div><code>make</code><p>Runs <code>CGO_ENABLED=0 go build</code>. Nothing to fetch &mdash; <code>net/http</code>, <code>encoding/json</code>, <code>archive/tar</code>+<code>zip</code>, and <code>debug/elf</code> cover everything a source-first package manager needs.</p></div></li>
       <li><div><code>sudo make install</code><p>Installs to <code>/usr/local/bin/goget</code>.</p></div></li>
       <li><div><code>goget build &lt;repo&gt;</code><p>Point it at anything and see what it finds.</p></div></li>
     </ol>

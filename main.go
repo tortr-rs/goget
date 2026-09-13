@@ -15,6 +15,10 @@ func printUsage(prog string) {
 			"                  clone when one exists; --latest forces git instead)\n"+
 			"  fetch <repo>    install a prebuilt release binary\n"+
 			"  show <repo>     show README + build script\n"+
+			"  genpkg [--aur] [--ebuild] <repo>\n"+
+			"                  generate a starting-point PKGBUILD and/or .ebuild for\n"+
+			"                  <repo> in the current directory (both if neither flag\n"+
+			"                  is given) -- templates, not submission-ready recipes\n"+
 			"  config          print current configuration\n"+
 			"  makeuser        create a new user account (requires root)\n",
 		prog)
@@ -128,6 +132,49 @@ func cmdFetch(arg string) int {
 }
 
 func buildWithSpec(spec *repospec, forceGit bool) int {
+	// Gentoo ebuilds aren't git-clonable per-package (the real portage
+	// tree is one multi-gigabyte repo covering every package at once),
+	// so this doesn't fit the generic tarball/git/buildsys-detect
+	// pipeline below at all -- it gets its own dedicated path.
+	if spec.host == gentooHost {
+		return buildGentoo(spec)
+	}
+
+	cfg := configLoad()
+
+	// Before touching git/tarball/cmake at all: check goget's own
+	// package repo (pkg.binrepo{} in goget.conf, unconfigured by
+	// default -- see binrepo.go). If it has this package, the choice of
+	// source-vs-binary is made up front instead of only offering a
+	// prebuilt fallback after a build-system-detection failure. If the
+	// repo isn't configured, doesn't have this package, or the host has
+	// no compatible asset in it, this falls straight through to the
+	// existing source-build flow below with no interruption.
+	if entry, ok := binRepoLookup(cfg, spec.repo); ok {
+		label := spec.repo
+		if entry.Version != "" {
+			label += " " + entry.Version
+		}
+		printInfo("found %s in the goget package repo.", label)
+		choice := promptPick([]string{"Build from source (GitHub)", "Install prebuilt binary (goget repo)"})
+		if choice < 0 {
+			printInfo("aborting.")
+			return 1
+		}
+		if choice == 1 {
+			switch rc := binRepoInstall(entry, spec.repo); rc {
+			case 0:
+				printOK("successfully installed %s", spec.repo)
+				return 0
+			case -1:
+				printErr("installing %s from the goget repo failed", spec.repo)
+				return 1
+			default:
+				printWarn("no compatible prebuilt asset for this host in the goget repo; building from source instead")
+			}
+		}
+	}
+
 	// Prefer downloading the latest tagged release's source archive over
 	// `git clone` -- same end result, without pulling the repo's entire
 	// history just to build one version. Falls back to git whenever
@@ -165,7 +212,6 @@ func buildWithSpec(spec *repospec, forceGit bool) int {
 
 	var useArgs []string
 	if kind == buildCMake {
-		cfg := configLoad()
 		useArgs = configBuildUseCmakeArgs(cfg, spec.repo)
 		for _, a := range useArgs {
 			printInfo("USE flag build option: %s", a)
@@ -279,6 +325,25 @@ func main() {
 			os.Exit(1)
 		}
 		os.Exit(cmdShow(os.Args[2]))
+
+	case "genpkg":
+		var repoArg string
+		wantAUR, wantEbuild := false, false
+		for _, a := range os.Args[2:] {
+			switch a {
+			case "--aur":
+				wantAUR = true
+			case "--ebuild":
+				wantEbuild = true
+			default:
+				repoArg = a
+			}
+		}
+		if repoArg == "" {
+			fmt.Fprintf(os.Stderr, "usage: %s genpkg [--aur] [--ebuild] <repo>\n", os.Args[0])
+			os.Exit(1)
+		}
+		os.Exit(cmdGenpkg(repoArg, wantAUR, wantEbuild))
 
 	case "config":
 		configPrint(configLoad())

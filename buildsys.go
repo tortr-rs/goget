@@ -9,12 +9,21 @@ const (
 	buildCMake
 	buildMake
 	buildAutotools
+	buildPKGBUILD
 )
 
 // buildsysDetect detects the build system in dir by checking for marker
-// files, in priority order: CMakeLists.txt -> cmake; an executable
-// "configure" script -> autotools; a Makefile -> make.
+// files, in priority order: PKGBUILD -> makepkg (checked first: an AUR
+// checkout's repo root contains only the PKGBUILD itself, never the
+// actual upstream project -- makepkg downloads that separately per the
+// PKGBUILD's own source=() array, so a PKGBUILD's presence is
+// unambiguous regardless of what the upstream project happens to use);
+// CMakeLists.txt -> cmake; an executable "configure" script ->
+// autotools; a Makefile -> make.
 func buildsysDetect(dir string) buildsysKind {
+	if pathExists(filepath.Join(dir, "PKGBUILD")) {
+		return buildPKGBUILD
+	}
 	if pathExists(filepath.Join(dir, "CMakeLists.txt")) {
 		return buildCMake
 	}
@@ -35,6 +44,8 @@ func buildsysName(kind buildsysKind) string {
 		return "Make"
 	case buildAutotools:
 		return "Autotools"
+	case buildPKGBUILD:
+		return "PKGBUILD (AUR)"
 	default:
 		return "none"
 	}
@@ -102,6 +113,22 @@ func buildAutotoolsImpl(dir string) int {
 	return buildMakeImpl(dir)
 }
 
+// buildPKGBUILDImpl builds and installs an AUR package via makepkg,
+// which handles the whole pipeline itself: resolving/installing build
+// and runtime dependencies via pacman, downloading upstream source per
+// the PKGBUILD's own source=() array, compiling, packaging, and (with
+// -si) installing via `sudo pacman -U`. Deliberately plain passthrough,
+// not spinner-wrapped: makepkg prompts interactively (dependency
+// confirmation, sudo's own password prompt) on the same live terminal,
+// matching every other sudo-driven install step in this file.
+func buildPKGBUILDImpl(dir string) int {
+	rc := runCommand(dir, []string{"makepkg", "-si"})
+	if rc != 0 {
+		printErr("makepkg failed")
+	}
+	return rc
+}
+
 // buildsysBuildAndInstall builds and installs the project in dir using
 // the given build system. extraCmakeFlags are appended to the cmake
 // configure step only; other build systems ignore them for now. Install
@@ -115,6 +142,8 @@ func buildsysBuildAndInstall(kind buildsysKind, dir string, extraCmakeFlags []st
 		return buildMakeImpl(dir)
 	case buildAutotools:
 		return buildAutotoolsImpl(dir)
+	case buildPKGBUILD:
+		return buildPKGBUILDImpl(dir)
 	default:
 		printErr("internal error: no build system to run")
 		return -1

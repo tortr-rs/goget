@@ -10,7 +10,14 @@ import (
 // goget always clones over https (even if the original spec was an
 // ssh:// or git@ URL) since it has no SSH key/agent setup step of its
 // own and https works for any public repo with no auth required.
+//
+// AUR is a special case: every package is a top-level git repo with no
+// owner segment (aur.archlinux.org/<name>.git), unlike the
+// host/owner/repo shape every other supported host uses.
 func gitCloneURL(spec *repospec) string {
+	if spec.host == aurHost {
+		return aurCloneURL(spec.repo)
+	}
 	return fmt.Sprintf("https://%s/%s/%s.git", spec.host, spec.owner, spec.repo)
 }
 

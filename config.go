@@ -7,7 +7,7 @@ import (
 	"strings"
 )
 
-const defaultConfig = "pkg.repos{github.on gitlab.on codeberg.on}\n"
+const defaultConfig = "pkg.repos{github.on gitlab.on codeberg.on aur.on gentoo.on}\n"
 
 type useFlag struct {
 	name string
@@ -20,8 +20,10 @@ type useBlock struct {
 }
 
 type gogetConfig struct {
-	githubOn, gitlabOn, codebergOn bool
-	useBlocks                      []useBlock
+	githubOn, gitlabOn, codebergOn, aurOn, gentooOn bool
+	useBlocks                                       []useBlock
+	binRepoURL                                      string // "" if pkg.binrepo{} isn't configured
+	binRepoEnabled                                  bool
 }
 
 func configDir() string {
@@ -51,6 +53,27 @@ func parseFlagToken(token string) (string, bool) {
 	return "", false // unreachable
 }
 
+// parseBinRepoBody parses pkg.binrepo{}'s body: a mix of "url=<value>"
+// (the repo index's base URL) and "<name>.on"/"<name>.off" flag tokens
+// (currently only "enabled", default on if the block is present at
+// all -- an explicit escape hatch to disable the repo check without
+// deleting the configured URL).
+func parseBinRepoBody(body string) (url string, enabled bool) {
+	enabled = true
+	for _, tok := range strings.Fields(body) {
+		if v, ok := strings.CutPrefix(tok, "url="); ok {
+			url = v
+			continue
+		}
+		name, on := parseFlagToken(tok)
+		if name != "enabled" {
+			dieConfig("unrecognized token '%s' in pkg.binrepo{}", tok)
+		}
+		enabled = on
+	}
+	return url, enabled
+}
+
 func parseBlockBody(body string, isReposBlock bool, cfg *gogetConfig) []useFlag {
 	var flags []useFlag
 	for _, tok := range strings.Fields(body) {
@@ -63,6 +86,10 @@ func parseBlockBody(body string, isReposBlock bool, cfg *gogetConfig) []useFlag 
 				cfg.gitlabOn = on
 			case "codeberg":
 				cfg.codebergOn = on
+			case "aur":
+				cfg.aurOn = on
+			case "gentoo":
+				cfg.gentooOn = on
 			default:
 				dieConfig("unrecognized host '%s' in pkg.repos{}", name)
 			}
@@ -74,7 +101,7 @@ func parseBlockBody(body string, isReposBlock bool, cfg *gogetConfig) []useFlag 
 }
 
 func parseConfig(content string) *gogetConfig {
-	cfg := &gogetConfig{githubOn: true, gitlabOn: true, codebergOn: true}
+	cfg := &gogetConfig{githubOn: true, gitlabOn: true, codebergOn: true, aurOn: true, gentooOn: true}
 
 	p := content
 	for {
@@ -123,6 +150,8 @@ func parseConfig(content string) *gogetConfig {
 		switch {
 		case key == "repos":
 			parseBlockBody(body, true, cfg)
+		case key == "binrepo":
+			cfg.binRepoURL, cfg.binRepoEnabled = parseBinRepoBody(body)
 		case key == "USE" || strings.HasSuffix(key, ".USE"):
 			pkg := ""
 			if key != "USE" {
@@ -165,8 +194,12 @@ func configHostEnabled(cfg *gogetConfig, host string) bool {
 		return cfg.gitlabOn
 	case "codeberg.org":
 		return cfg.codebergOn
+	case aurHost:
+		return cfg.aurOn
+	case gentooHost:
+		return cfg.gentooOn
 	default:
-		return true // hosts outside the three goget.conf tracks are unaffected
+		return true // hosts outside goget.conf's tracked set are unaffected
 	}
 }
 
@@ -178,6 +211,10 @@ func configSetHostEnabled(cfg *gogetConfig, host string, enabled bool) {
 		cfg.gitlabOn = enabled
 	case "codeberg.org":
 		cfg.codebergOn = enabled
+	case aurHost:
+		cfg.aurOn = enabled
+	case gentooHost:
+		cfg.gentooOn = enabled
 	}
 }
 
@@ -190,8 +227,11 @@ func onOff(b bool) string {
 
 func renderConfig(cfg *gogetConfig) string {
 	var sb strings.Builder
-	fmt.Fprintf(&sb, "pkg.repos{github.%s gitlab.%s codeberg.%s}\n",
-		onOff(cfg.githubOn), onOff(cfg.gitlabOn), onOff(cfg.codebergOn))
+	fmt.Fprintf(&sb, "pkg.repos{github.%s gitlab.%s codeberg.%s aur.%s gentoo.%s}\n",
+		onOff(cfg.githubOn), onOff(cfg.gitlabOn), onOff(cfg.codebergOn), onOff(cfg.aurOn), onOff(cfg.gentooOn))
+	if cfg.binRepoURL != "" {
+		fmt.Fprintf(&sb, "pkg.binrepo{url=%s enabled.%s}\n", cfg.binRepoURL, onOff(cfg.binRepoEnabled))
+	}
 	for _, b := range cfg.useBlocks {
 		if b.pkg == "" {
 			sb.WriteString("pkg.USE{")
@@ -247,7 +287,7 @@ func configPrint(cfg *gogetConfig) {
 }
 
 type flagMapping struct {
-	flag        string
+	flag         string
 	cmakeOptions []string
 }
 
