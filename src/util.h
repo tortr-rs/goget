@@ -20,4 +20,21 @@ char *str_to_lower_dup(const char *s);
  * pointer separately if it was heap-allocated, or keep a copy). */
 char *str_trim(char *s);
 
+int path_exists(const char *path);
+int path_is_dir(const char *path);
+int path_is_executable_file(const char *path);
+
+/* mkdir -p equivalent: creates path and all missing parent directories
+ * with mode 0755. Returns 0 on success (including "already exists"), -1
+ * with errno set on failure. */
+int mkdir_p(const char *path);
+
+/* Returns a newly-allocated copy of the current user's home directory,
+ * from $HOME or, failing that, the passwd database. Exits fatally if
+ * neither source works, since goget cannot function without it. */
+char *get_home_dir(void);
+
+/* Returns a newly-allocated "a/b". */
+char *path_join(const char *a, const char *b);
+
 #endif
