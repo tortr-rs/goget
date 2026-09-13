@@ -1,3 +1,5 @@
+# Goget is a https://chamesle.org project : goget.chamesle.org
+
 # goget
 
 A source-first, cross-distro-aware package manager. Given a repo spec,
