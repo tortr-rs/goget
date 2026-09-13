@@ -15,4 +15,20 @@
 int run_command_in(const char *cwd, char *const argv[]);
 int run_command(char *const argv[]);
 
+/* Runs argv (no shell, argv[0] found via PATH) and captures its stdout
+ * into a newly-allocated NUL-terminated buffer, discarding stderr to
+ * /dev/null. Sets *out_status to the child's exit status (or -1, same
+ * meaning as run_command's return). Returns the captured buffer (never
+ * NULL, may be empty "") -- caller must free it. Used for parsing tool
+ * output (ldd --version, objdump -T, readelf), not for anything
+ * interactive. */
+char *run_command_capture(char *const argv[], int *out_status);
+
+/* Runs argv, feeding `input` to its stdin (then closing it) instead of
+ * inheriting the caller's stdin. Used for chpasswd, which reads
+ * "user:password\n" from stdin rather than taking it as an argument (an
+ * argument would leak the password via /proc/<pid>/cmdline). Returns the
+ * same exit-status convention as run_command. */
+int run_command_with_stdin(char *const argv[], const char *input);
+
 #endif

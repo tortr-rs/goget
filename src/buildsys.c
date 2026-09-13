@@ -96,9 +96,11 @@ static int build_make(const char *dir) {
     char *const install_argv[] = {"sudo", "make", "install", NULL};
     rc = run_command_in(dir, install_argv);
     if (rc != 0) {
-        fprintf(stderr,
-                "goget: 'make install' failed -- this project may not "
-                "define an install target.\n");
+        /* Don't guess at a specific cause (missing install target, a file
+         * the install step references being absent, a permissions issue,
+         * ...) -- make already printed the real reason above; repeating a
+         * wrong guess is worse than saying nothing. */
+        fprintf(stderr, "goget: 'make install' failed -- see output above for the reason.\n");
     }
     return rc;
 }

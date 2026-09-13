@@ -18,6 +18,15 @@ void *xmalloc(size_t size) {
     return p;
 }
 
+void *xrealloc(void *ptr, size_t size) {
+    void *p = realloc(ptr, size);
+    if (!p) {
+        fprintf(stderr, "goget: out of memory\n");
+        exit(1);
+    }
+    return p;
+}
+
 char *xstrdup(const char *s) {
     size_t len = strlen(s) + 1;
     char *copy = xmalloc(len);
@@ -41,6 +50,21 @@ int str_ends_with(const char *s, const char *suffix) {
 
 int str_starts_with(const char *s, const char *prefix) {
     return strncmp(s, prefix, strlen(prefix)) == 0;
+}
+
+int str_ci_contains(const char *haystack, const char *needle) {
+    size_t hlen = strlen(haystack);
+    size_t nlen = strlen(needle);
+    if (nlen == 0) return 1;
+    if (nlen > hlen) return 0;
+    for (size_t i = 0; i + nlen <= hlen; i++) {
+        size_t j = 0;
+        for (; j < nlen; j++) {
+            if (tolower((unsigned char)haystack[i + j]) != tolower((unsigned char)needle[j])) break;
+        }
+        if (j == nlen) return 1;
+    }
+    return 0;
 }
 
 char *str_to_lower_dup(const char *s) {
@@ -118,5 +142,24 @@ char *path_join(const char *a, const char *b) {
     size_t needed = strlen(a) + 1 + strlen(b) + 1;
     char *out = xmalloc(needed);
     snprintf(out, needed, "%s/%s", a, b);
+    return out;
+}
+
+char *url_encode(const char *s) {
+    static const char *hex = "0123456789ABCDEF";
+    size_t len = strlen(s);
+    char *out = xmalloc(len * 3 + 1);
+    size_t j = 0;
+    for (size_t i = 0; i < len; i++) {
+        unsigned char c = (unsigned char)s[i];
+        if (isalnum(c) || c == '-' || c == '_' || c == '.' || c == '~') {
+            out[j++] = (char)c;
+        } else {
+            out[j++] = '%';
+            out[j++] = hex[(c >> 4) & 0xF];
+            out[j++] = hex[c & 0xF];
+        }
+    }
+    out[j] = '\0';
     return out;
 }

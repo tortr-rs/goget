@@ -1,6 +1,6 @@
 CC       ?= gcc
 CFLAGS   ?= -std=c11 -Wall -Wextra -g -O0
-CPPFLAGS := -Isrc -Ivendor
+CPPFLAGS := -D_POSIX_C_SOURCE=200809L -D_DEFAULT_SOURCE -Isrc -Ivendor
 LDLIBS   := $(shell pkg-config --libs libcurl)
 CFLAGS   += $(shell pkg-config --cflags libcurl)
 
