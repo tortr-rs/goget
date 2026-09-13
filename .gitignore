@@ -1,0 +1,5 @@
+goget
+src/*.o
+vendor/*.o
+*.o
+.cache/
